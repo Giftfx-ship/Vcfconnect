@@ -389,7 +389,7 @@
             color: #DC2626;
         }
 
-        /* Contacts */
+        /* Contacts Table */
         .contacts-card {
             background: rgba(255, 255, 255, 0.9);
             backdrop-filter: blur(8px);
@@ -421,12 +421,6 @@
             font-weight: 500;
         }
 
-        .edit-hint {
-            font-size: 12px;
-            color: var(--gray-400);
-            font-weight: 400;
-        }
-
         .table-wrap {
             overflow-x: auto;
             border-radius: var(--radius);
@@ -437,6 +431,7 @@
             width: 100%;
             border-collapse: collapse;
             font-size: 13px;
+            min-width: 500px;
         }
 
         .table th {
@@ -448,22 +443,39 @@
             font-size: 11px;
             text-transform: uppercase;
             letter-spacing: 0.4px;
-            border-bottom: 1px solid var(--gray-200);
+            border-bottom: 2px solid var(--gray-200);
+            white-space: nowrap;
         }
 
         .table td {
             padding: 10px 14px;
             border-bottom: 1px solid var(--gray-100);
             color: var(--gray-700);
+            vertical-align: middle;
+            word-break: break-word;
         }
 
         .table tr:hover td {
             background: var(--gray-50);
         }
 
-        .table .phone {
-            font-weight: 500;
+        .table .name-cell {
+            font-weight: 600;
             color: var(--gray-900);
+            min-width: 100px;
+        }
+
+        .table .phone-cell {
+            font-weight: 500;
+            color: var(--gray-800);
+            font-family: 'Inter', monospace;
+            min-width: 130px;
+            letter-spacing: 0.3px;
+        }
+
+        .table .joined-cell {
+            text-align: center;
+            min-width: 80px;
         }
 
         .table .joined-yes {
@@ -475,6 +487,69 @@
             color: var(--gray-400);
         }
 
+        .table .actions-cell {
+            text-align: center;
+            min-width: 80px;
+            white-space: nowrap;
+        }
+
+        /* Action Icons */
+        .action-icons {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .icon-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 6px;
+            transition: all var(--transition);
+            font-size: 16px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .icon-btn:hover {
+            transform: scale(1.15);
+        }
+
+        .icon-btn.edit {
+            color: var(--primary);
+        }
+
+        .icon-btn.edit:hover {
+            background: var(--primary-light);
+        }
+
+        .icon-btn.delete {
+            color: var(--danger);
+        }
+
+        .icon-btn.delete:hover {
+            background: #FEE2E2;
+        }
+
+        .icon-btn.save {
+            color: var(--success);
+        }
+
+        .icon-btn.save:hover {
+            background: #DCFCE7;
+        }
+
+        .icon-btn.cancel {
+            color: var(--gray-400);
+        }
+
+        .icon-btn.cancel:hover {
+            background: var(--gray-100);
+        }
+
         /* Edit Mode */
         .edit-input {
             padding: 6px 10px;
@@ -483,8 +558,9 @@
             font-size: 13px;
             font-family: inherit;
             width: 100%;
-            min-width: 120px;
+            min-width: 80px;
             background: white;
+            transition: all var(--transition);
         }
 
         .edit-input:focus {
@@ -500,75 +576,12 @@
             font-family: inherit;
             background: white;
             cursor: pointer;
+            min-width: 80px;
         }
 
         .edit-select:focus {
             outline: none;
             box-shadow: 0 0 0 3px var(--primary-glow);
-        }
-
-        .btn-save-edit {
-            padding: 4px 12px;
-            background: var(--success);
-            color: white;
-            border: none;
-            border-radius: 6px;
-            font-size: 12px;
-            font-weight: 600;
-            cursor: pointer;
-            font-family: inherit;
-            transition: all var(--transition);
-            margin-right: 4px;
-        }
-
-        .btn-save-edit:hover {
-            transform: scale(1.05);
-            opacity: 0.9;
-        }
-
-        .btn-cancel-edit {
-            padding: 4px 12px;
-            background: var(--gray-300);
-            color: var(--gray-700);
-            border: none;
-            border-radius: 6px;
-            font-size: 12px;
-            font-weight: 600;
-            cursor: pointer;
-            font-family: inherit;
-            transition: all var(--transition);
-            margin-right: 4px;
-        }
-
-        .btn-cancel-edit:hover {
-            background: var(--gray-400);
-        }
-
-        .btn-delete {
-            padding: 4px 12px;
-            background: var(--danger);
-            color: white;
-            border: none;
-            border-radius: 6px;
-            font-size: 12px;
-            font-weight: 600;
-            cursor: pointer;
-            font-family: inherit;
-            transition: all var(--transition);
-        }
-
-        .btn-delete:hover {
-            transform: scale(1.05);
-            opacity: 0.9;
-        }
-
-        .contact-row {
-            cursor: pointer;
-            transition: background var(--transition);
-        }
-
-        .contact-row:hover {
-            background: var(--gray-50);
         }
 
         .empty-state {
@@ -654,30 +667,6 @@
             background: #1DA851;
             transform: translateY(-2px);
             box-shadow: 0 8px 24px rgba(37, 211, 102, 0.3);
-        }
-
-        .btn-danger {
-            background: var(--danger);
-            color: #fff;
-            box-shadow: 0 4px 16px rgba(220, 38, 38, 0.2);
-        }
-
-        .btn-danger:hover {
-            background: #B91C1C;
-            transform: translateY(-2px);
-            box-shadow: 0 8px 24px rgba(220, 38, 38, 0.25);
-        }
-
-        .btn-warning {
-            background: var(--warning);
-            color: #fff;
-            box-shadow: 0 4px 16px rgba(245, 158, 11, 0.25);
-        }
-
-        .btn-warning:hover {
-            background: #D97706;
-            transform: translateY(-2px);
-            box-shadow: 0 8px 24px rgba(245, 158, 11, 0.3);
         }
 
         .btn-outline {
@@ -841,18 +830,40 @@
                 justify-content: center;
             }
 
-            .edit-input {
-                min-width: 80px;
+            .table {
                 font-size: 12px;
-                padding: 4px 8px;
+                min-width: 400px;
             }
 
-            .btn-save-edit,
-            .btn-cancel-edit,
-            .btn-delete {
-                font-size: 10px;
-                padding: 3px 8px;
-                margin-right: 2px;
+            .table th,
+            .table td {
+                padding: 8px 10px;
+            }
+
+            .table .phone-cell {
+                min-width: 100px;
+                font-size: 11px;
+            }
+
+            .edit-input {
+                min-width: 60px;
+                font-size: 11px;
+                padding: 4px 6px;
+            }
+
+            .edit-select {
+                min-width: 60px;
+                font-size: 11px;
+                padding: 4px 6px;
+            }
+
+            .icon-btn {
+                font-size: 14px;
+                padding: 2px 4px;
+            }
+
+            .action-icons {
+                gap: 3px;
             }
         }
 
@@ -873,15 +884,50 @@
                 padding: 16px;
             }
 
+            .table {
+                font-size: 11px;
+                min-width: 320px;
+            }
+
             .table th,
             .table td {
-                padding: 6px 10px;
-                font-size: 12px;
+                padding: 6px 8px;
+            }
+
+            .table .phone-cell {
+                min-width: 80px;
+                font-size: 10px;
+            }
+
+            .table .name-cell {
+                min-width: 60px;
+                font-size: 11px;
             }
 
             .edit-input {
-                min-width: 60px;
-                font-size: 11px;
+                min-width: 50px;
+                font-size: 10px;
+                padding: 3px 4px;
+            }
+
+            .edit-select {
+                min-width: 50px;
+                font-size: 10px;
+                padding: 3px 4px;
+            }
+
+            .icon-btn {
+                font-size: 12px;
+                padding: 2px 3px;
+            }
+
+            .action-icons {
+                gap: 2px;
+            }
+
+            .btn {
+                font-size: 12px;
+                padding: 8px 14px;
             }
         }
     </style>
@@ -978,10 +1024,7 @@
                     <!-- Contacts -->
                     <div class="contacts-card">
                         <div class="contacts-header">
-                            <div>
-                                <span class="contacts-title">📋 Submitted Contacts</span>
-                                <span class="edit-hint"> (Double-click to edit)</span>
-                            </div>
+                            <span class="contacts-title">📋 Submitted Contacts</span>
                             <span class="contacts-count" id="contactCount">0 contacts</span>
                         </div>
                         <div class="table-wrap">
@@ -990,8 +1033,8 @@
                                     <tr>
                                         <th>Name</th>
                                         <th>Phone</th>
-                                        <th>Joined Group</th>
-                                        <th>Submitted</th>
+                                        <th style="text-align:center;">Joined Group</th>
+                                        <th style="text-align:center;">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody id="contactsBody">
@@ -1047,7 +1090,14 @@
         let token = localStorage.getItem('adminToken');
         let batchData = null;
         let timerInterval = null;
-        let editingContactId = null;
+
+        // ============ XSS PROTECTION: Escape HTML ============
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
 
         // ============ DOM REFS ============
         const loginContainer = document.getElementById('loginContainer');
@@ -1184,7 +1234,7 @@
         function renderStats(data) {
             totalContacts.textContent = data.total || 0;
             batchNumber.textContent = data.batch?.batchNumber || 1;
-            
+
             const now = new Date();
             const end = new Date(data.batch?.endTime);
             let effectiveEnd = new Date(end);
@@ -1192,12 +1242,12 @@
                 effectiveEnd = new Date(end.getTime() + data.batch.pauseDuration);
             }
             const isExpired = now >= effectiveEnd;
-            
+
             batchStatus.textContent = isExpired ? 'Expired' : 'Active';
             batchStatus.className = 'stat-card-value ' + (isExpired ? 'danger' : 'success');
         }
 
-        // ============ RENDER CONTACTS ============
+        // ============ RENDER CONTACTS (With XSS Protection) ============
         function renderContacts(contacts) {
             const tbody = contactsBody;
             tbody.innerHTML = '';
@@ -1218,74 +1268,93 @@
                 tr.dataset.name = contact.name;
                 tr.dataset.phone = contact.phone;
                 tr.dataset.joined = contact.hasJoinedGroup;
-                
-                const joined = contact.hasJoinedGroup ? '✅' : '❌';
+
+                const joinedText = contact.hasJoinedGroup ? '✅ Yes' : '❌ No';
                 const joinedClass = contact.hasJoinedGroup ? 'joined-yes' : 'joined-no';
-                const date = new Date(contact.createdAt).toLocaleDateString();
+
+                // ESCAPE HTML to prevent XSS
+                const safeName = escapeHtml(contact.name);
+                const safePhone = escapeHtml(contact.phone);
 
                 tr.innerHTML = `
-                    <td><strong>${contact.name}</strong></td>
-                    <td class="phone">${contact.phone}</td>
-                    <td class="${joinedClass}">${joined}</td>
-                    <td>${date}</td>
+                    <td class="name-cell">${safeName}</td>
+                    <td class="phone-cell">${safePhone}</td>
+                    <td class="joined-cell ${joinedClass}">${joinedText}</td>
+                    <td class="actions-cell">
+                        <div class="action-icons">
+                            <button class="icon-btn edit" onclick="startEdit('${contact._id}')" title="Edit Contact">
+                                ✏️
+                            </button>
+                            <button class="icon-btn delete" onclick="deleteContact('${contact._id}')" title="Delete Contact">
+                                🗑️
+                            </button>
+                        </div>
+                    </td>
                 `;
                 tbody.appendChild(tr);
             });
-            
-            // Make rows editable
-            makeRowsEditable();
         }
 
-        // ============ EDIT CONTACT FUNCTIONS ============
-        function makeRowsEditable() {
-            document.querySelectorAll('.contact-row').forEach(row => {
-                // Remove old listeners by cloning
-                const newRow = row.cloneNode(true);
-                row.parentNode.replaceChild(newRow, row);
-                
-                newRow.addEventListener('dblclick', function() {
-                    const id = this.dataset.id;
-                    const name = this.dataset.name;
-                    const phone = this.dataset.phone;
-                    const joined = this.dataset.joined === 'true';
-                    
-                    editingContactId = id;
-                    
-                    // Replace row with edit form
-                    this.innerHTML = `
-                        <td>
-                            <input type="text" class="edit-input" value="${name}" id="editName" />
-                        </td>
-                        <td>
-                            <input type="text" class="edit-input" value="${phone}" id="editPhone" />
-                        </td>
-                        <td>
-                            <select class="edit-select" id="editJoined">
-                                <option value="true" ${joined ? 'selected' : ''}>✅ Joined</option>
-                                <option value="false" ${!joined ? 'selected' : ''}>❌ Not Joined</option>
-                            </select>
-                        </td>
-                        <td>
-                            <button class="btn-save-edit" onclick="saveContact('${id}')">💾 Save</button>
-                            <button class="btn-cancel-edit" onclick="cancelEdit()">✕</button>
-                            <button class="btn-delete" onclick="deleteContact('${id}')">🗑️</button>
-                        </td>
-                    `;
-                });
+        // ============ START EDIT (With XSS Protection) ============
+        function startEdit(id) {
+            const rows = document.querySelectorAll('.contact-row');
+            let targetRow = null;
+            let contactData = null;
+
+            rows.forEach(row => {
+                if (row.dataset.id === id) {
+                    targetRow = row;
+                    contactData = {
+                        name: row.dataset.name,
+                        phone: row.dataset.phone,
+                        joined: row.dataset.joined === 'true'
+                    };
+                }
             });
+
+            if (!targetRow || !contactData) return;
+
+            // Escape values before putting in input fields
+            const safeName = escapeHtml(contactData.name);
+            const safePhone = escapeHtml(contactData.phone);
+
+            targetRow.innerHTML = `
+                <td>
+                    <input type="text" class="edit-input" value="${safeName}" id="editName_${id}" />
+                </td>
+                <td>
+                    <input type="text" class="edit-input" value="${safePhone}" id="editPhone_${id}" />
+                </td>
+                <td>
+                    <select class="edit-select" id="editJoined_${id}">
+                        <option value="true" ${contactData.joined ? 'selected' : ''}>✅ Yes</option>
+                        <option value="false" ${!contactData.joined ? 'selected' : ''}>❌ No</option>
+                    </select>
+                </td>
+                <td class="actions-cell">
+                    <div class="action-icons">
+                        <button class="icon-btn save" onclick="saveContact('${id}')" title="Save Changes">
+                            💾
+                        </button>
+                        <button class="icon-btn cancel" onclick="cancelEdit()" title="Cancel Edit">
+                            ✕
+                        </button>
+                    </div>
+                </td>
+            `;
         }
 
-        // Save edited contact
+        // ============ SAVE CONTACT ============
         async function saveContact(id) {
-            const name = document.getElementById('editName').value.trim();
-            const phone = document.getElementById('editPhone').value.trim();
-            const hasJoinedGroup = document.getElementById('editJoined').value === 'true';
-            
+            const name = document.getElementById(`editName_${id}`).value.trim();
+            const phone = document.getElementById(`editPhone_${id}`).value.trim();
+            const hasJoinedGroup = document.getElementById(`editJoined_${id}`).value === 'true';
+
             if (!name || !phone) {
                 showToast('Name and phone required', 'error');
                 return;
             }
-            
+
             try {
                 const res = await fetch(`/api/admin/contact/${id}`, {
                     method: 'PUT',
@@ -1295,7 +1364,7 @@
                     },
                     body: JSON.stringify({ name, phone, hasJoinedGroup })
                 });
-                
+
                 const data = await res.json();
                 if (data.success) {
                     showToast('✅ Contact updated!', 'success');
@@ -1308,21 +1377,21 @@
             }
         }
 
-        // Cancel edit
+        // ============ CANCEL EDIT ============
         function cancelEdit() {
-            fetchData(); // Reload to reset the row
+            fetchData();
         }
 
-        // Delete contact
+        // ============ DELETE CONTACT ============
         async function deleteContact(id) {
             if (!confirm('Delete this contact?')) return;
-            
+
             try {
                 const res = await fetch(`/api/admin/contact/${id}`, {
                     method: 'DELETE',
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                
+
                 const data = await res.json();
                 if (data.success) {
                     showToast('🗑️ Contact deleted', 'success');
@@ -1341,7 +1410,7 @@
 
             const now = new Date();
             const end = new Date(batch.endTime);
-            
+
             let effectiveEnd = new Date(end);
             if (batch.pauseDuration > 0) {
                 effectiveEnd = new Date(end.getTime() + batch.pauseDuration);
@@ -1352,7 +1421,7 @@
                 const totalPaused = batch.pauseDuration + timePausedSoFar;
                 effectiveEnd = new Date(end.getTime() + totalPaused);
             }
-            
+
             const diff = effectiveEnd - now;
 
             if (diff <= 0) {
@@ -1398,7 +1467,7 @@
             if (!batch) return;
 
             const isPaused = batch.isPaused || false;
-            
+
             const now = new Date();
             const end = new Date(batch.endTime);
             let effectiveEnd = new Date(end);
@@ -1440,7 +1509,6 @@
 
         // ============ TIMER CONTROLS ============
 
-        // Pause Timer
         pauseTimerBtn.addEventListener('click', async () => {
             if (!token) return;
 
@@ -1462,7 +1530,6 @@
             }
         });
 
-        // Resume Timer
         resumeTimerBtn.addEventListener('click', async () => {
             if (!token) return;
 
@@ -1484,7 +1551,6 @@
             }
         });
 
-        // Reset Timer
         resetTimerBtn.addEventListener('click', async () => {
             if (!token) return;
             if (!confirm('Reset timer to 2 days from now?')) return;
@@ -1538,7 +1604,7 @@
                 a.click();
                 document.body.removeChild(a);
                 window.URL.revokeObjectURL(url);
-                
+
                 showToast('✅ VCF downloaded successfully!', 'success');
             } catch (error) {
                 showToast('Error downloading VCF', 'error');
@@ -1548,7 +1614,7 @@
         // ============ START NEW BATCH ============
         newBatchBtn.addEventListener('click', async () => {
             if (!token) return;
-            if (!confirm('Start a new batch? This will end the current batch.')) return;
+            if (!confirm('⚠️ Starting a new batch will hide current contacts from this view. They stay in the database.\n\nContinue?')) return;
 
             try {
                 const res = await fetch('/api/admin/new-batch', {
