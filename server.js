@@ -34,6 +34,9 @@ const BatchSchema = new mongoose.Schema({
   startTime: { type: Date, default: Date.now },
   endTime: { type: Date, required: true },
   isActive: { type: Boolean, default: true },
+  isPaused: { type: Boolean, default: false },
+  pausedAt: { type: Date },
+  pauseDuration: { type: Number, default: 0 },
   isDownloadable: { type: Boolean, default: false },
   totalContacts: { type: Number, default: 0 },
   groupLink: { type: String, default: process.env.GROUP_LINK },
@@ -93,6 +96,8 @@ const authenticate = async (req, res, next) => {
       startTime: now,
       endTime: endTime,
       isActive: true,
+      isPaused: false,
+      pauseDuration: 0,
       isDownloadable: false,
     });
     console.log('✅ Initial batch created');
@@ -108,14 +113,27 @@ app.get('/api/batch/status', async (req, res) => {
     if (!batch) return res.status(404).json({ error: 'No active batch' });
     
     const now = new Date();
-    const remaining = batch.endTime - now;
+    let effectiveEndTime = new Date(batch.endTime);
+    if (batch.pauseDuration > 0) {
+      effectiveEndTime = new Date(batch.endTime.getTime() + batch.pauseDuration);
+    }
+    if (batch.isPaused && batch.pausedAt) {
+      const pausedAt = new Date(batch.pausedAt);
+      const timePausedSoFar = now - pausedAt;
+      const totalPaused = batch.pauseDuration + timePausedSoFar;
+      effectiveEndTime = new Date(batch.endTime.getTime() + totalPaused);
+    }
+    
+    const remaining = effectiveEndTime - now;
     
     res.json({
       batchNumber: batch.batchNumber,
       startTime: batch.startTime,
       endTime: batch.endTime,
+      effectiveEndTime: effectiveEndTime,
       remaining: Math.max(0, remaining),
-      isDownloadable: now >= batch.endTime,
+      isPaused: batch.isPaused || false,
+      isDownloadable: now >= effectiveEndTime,
       totalContacts: batch.totalContacts,
       groupLink: batch.groupLink,
       isActive: batch.isActive
@@ -136,6 +154,10 @@ app.post('/api/submit', async (req, res) => {
     
     const batch = await Batch.findOne({ isActive: true });
     if (!batch) return res.status(400).json({ error: 'No active batch' });
+    
+    if (batch.isPaused) {
+      return res.status(400).json({ error: 'Batch is currently paused. Please try again later.' });
+    }
     
     const existing = await Contact.findOne({ 
       phone: phone,
@@ -219,12 +241,21 @@ app.get('/api/admin/download/vcf', authenticate, async (req, res) => {
     const batch = await Batch.findOne({ isActive: true });
     if (!batch) return res.status(404).json({ error: 'No active batch' });
     
+    let effectiveEndTime = new Date(batch.endTime);
+    if (batch.pauseDuration > 0) {
+      effectiveEndTime = new Date(batch.endTime.getTime() + batch.pauseDuration);
+    }
+    
     const now = new Date();
-    if (now < batch.endTime) {
+    if (now < effectiveEndTime) {
       return res.status(400).json({ error: 'Batch not yet downloadable' });
     }
     
     const contacts = await Contact.find({ batchId: batch._id });
+    
+    if (contacts.length === 0) {
+      return res.status(400).json({ error: 'No contacts to download' });
+    }
     
     let vcfContent = '';
     contacts.forEach(contact => {
@@ -246,7 +277,100 @@ app.get('/api/admin/download/vcf', authenticate, async (req, res) => {
   }
 });
 
-// Start new batch (admin only)
+// ============ TIMER CONTROLS ============
+
+// Pause timer
+app.post('/api/admin/pause-timer', authenticate, async (req, res) => {
+  try {
+    const batch = await Batch.findOne({ isActive: true });
+    if (!batch) return res.status(404).json({ error: 'No active batch' });
+    
+    if (batch.isPaused) {
+      return res.status(400).json({ error: 'Timer is already paused' });
+    }
+    
+    const now = new Date();
+    let effectiveEndTime = new Date(batch.endTime);
+    if (batch.pauseDuration > 0) {
+      effectiveEndTime = new Date(batch.endTime.getTime() + batch.pauseDuration);
+    }
+    
+    if (now >= effectiveEndTime) {
+      return res.status(400).json({ error: 'Timer has already expired' });
+    }
+    
+    batch.isPaused = true;
+    batch.pausedAt = now;
+    await batch.save();
+    
+    res.json({ 
+      success: true, 
+      message: 'Timer paused successfully',
+      isPaused: true
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Resume timer
+app.post('/api/admin/resume-timer', authenticate, async (req, res) => {
+  try {
+    const batch = await Batch.findOne({ isActive: true });
+    if (!batch) return res.status(404).json({ error: 'No active batch' });
+    
+    if (!batch.isPaused) {
+      return res.status(400).json({ error: 'Timer is not paused' });
+    }
+    
+    const now = new Date();
+    const pausedAt = new Date(batch.pausedAt);
+    const timePaused = now - pausedAt;
+    
+    batch.pauseDuration = (batch.pauseDuration || 0) + timePaused;
+    batch.isPaused = false;
+    batch.pausedAt = null;
+    await batch.save();
+    
+    res.json({ 
+      success: true, 
+      message: 'Timer resumed successfully',
+      isPaused: false
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Reset timer
+app.post('/api/admin/reset-timer', authenticate, async (req, res) => {
+  try {
+    const batch = await Batch.findOne({ isActive: true });
+    if (!batch) return res.status(404).json({ error: 'No active batch' });
+    
+    const now = new Date();
+    const newEndTime = new Date(now);
+    newEndTime.setDate(newEndTime.getDate() + 2);
+    
+    batch.startTime = now;
+    batch.endTime = newEndTime;
+    batch.isPaused = false;
+    batch.pausedAt = null;
+    batch.pauseDuration = 0;
+    batch.isDownloadable = false;
+    await batch.save();
+    
+    res.json({ 
+      success: true, 
+      message: 'Timer reset successfully',
+      endTime: newEndTime
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Start new batch
 app.post('/api/admin/new-batch', authenticate, async (req, res) => {
   try {
     await Batch.updateMany({ isActive: true }, { isActive: false });
@@ -263,6 +387,8 @@ app.post('/api/admin/new-batch', authenticate, async (req, res) => {
       startTime: now,
       endTime: endTime,
       isActive: true,
+      isPaused: false,
+      pauseDuration: 0,
       isDownloadable: false,
     });
     
