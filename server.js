@@ -61,24 +61,13 @@ const Admin = mongoose.model('Admin', AdminSchema);
 
 // ============ HELPER: Clean Phone Number ============
 function cleanPhoneNumber(phone) {
-  // Remove all spaces, dashes, parentheses
   let cleaned = phone.replace(/[\s\-\(\)]/g, '');
-  
-  // Remove any '++' at the start (replace with single '+')
   cleaned = cleaned.replace(/^\+\+/, '+');
-  
-  // If it starts with '00', replace with '+'
   cleaned = cleaned.replace(/^00/, '+');
-  
-  // If it starts with just '0' and has more digits, remove the leading 0
   if (cleaned.startsWith('0') && cleaned.length > 1) {
-    // But only if it's not '0' alone
     cleaned = cleaned.replace(/^0/, '');
   }
-  
-  // Remove any remaining non-digit characters except '+'
   cleaned = cleaned.replace(/[^0-9+]/g, '');
-  
   return cleaned;
 }
 
@@ -167,7 +156,7 @@ app.get('/api/batch/status', async (req, res) => {
   }
 });
 
-// Submit contact - WITH PHONE CLEANUP
+// Submit contact
 app.post('/api/submit', async (req, res) => {
   try {
     let { name, phone } = req.body;
@@ -176,7 +165,6 @@ app.post('/api/submit', async (req, res) => {
       return res.status(400).json({ error: 'Name and phone required' });
     }
     
-    // Clean the phone number
     phone = cleanPhoneNumber(phone);
     
     if (!phone || phone.length < 5) {
@@ -190,7 +178,6 @@ app.post('/api/submit', async (req, res) => {
       return res.status(400).json({ error: 'Batch is currently paused. Please try again later.' });
     }
     
-    // Check for duplicate phone (using cleaned phone)
     const existing = await Contact.findOne({ 
       phone: phone,
       batchId: batch._id 
@@ -267,6 +254,150 @@ app.get('/api/admin/contacts', authenticate, async (req, res) => {
   }
 });
 
+// ============ NEW: EDIT CONTACT (Admin only) ============
+app.put('/api/admin/contact/:id', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+    let { name, phone, hasJoinedGroup } = req.body;
+    
+    if (!name || !phone) {
+      return res.status(400).json({ error: 'Name and phone required' });
+    }
+    
+    // Clean phone number
+    phone = cleanPhoneNumber(phone);
+    
+    if (!phone || phone.length < 5) {
+      return res.status(400).json({ error: 'Invalid phone number' });
+    }
+    
+    const contact = await Contact.findById(id);
+    if (!contact) {
+      return res.status(404).json({ error: 'Contact not found' });
+    }
+    
+    // Check for duplicate phone (excluding current contact)
+    const existing = await Contact.findOne({
+      phone: phone,
+      batchId: contact.batchId,
+      _id: { $ne: id }
+    });
+    if (existing) {
+      return res.status(400).json({ error: 'Phone number already exists in this batch' });
+    }
+    
+    contact.name = name.trim();
+    contact.phone = phone;
+    if (hasJoinedGroup !== undefined) {
+      contact.hasJoinedGroup = hasJoinedGroup;
+    }
+    await contact.save();
+    
+    res.json({
+      success: true,
+      message: 'Contact updated successfully',
+      contact: contact
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============ NEW: DELETE CONTACT (Admin only) ============
+app.delete('/api/admin/contact/:id', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const contact = await Contact.findById(id);
+    if (!contact) {
+      return res.status(404).json({ error: 'Contact not found' });
+    }
+    
+    await contact.deleteOne();
+    
+    // Update batch total
+    const batch = await Batch.findById(contact.batchId);
+    if (batch) {
+      batch.totalContacts = Math.max(0, batch.totalContacts - 1);
+      await batch.save();
+    }
+    
+    res.json({
+      success: true,
+      message: 'Contact deleted successfully'
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============ NEW: BULK UPDATE CONTACTS (Admin only) ============
+app.post('/api/admin/contacts/bulk-update', authenticate, async (req, res) => {
+  try {
+    const { contacts } = req.body;
+    
+    if (!contacts || !Array.isArray(contacts)) {
+      return res.status(400).json({ error: 'Invalid contacts data' });
+    }
+    
+    const updates = [];
+    const errors = [];
+    
+    for (const item of contacts) {
+      try {
+        const { id, name, phone, hasJoinedGroup } = item;
+        
+        if (!id || !name || !phone) {
+          errors.push({ id, error: 'Missing required fields' });
+          continue;
+        }
+        
+        const cleanedPhone = cleanPhoneNumber(phone);
+        if (!cleanedPhone || cleanedPhone.length < 5) {
+          errors.push({ id, error: 'Invalid phone number' });
+          continue;
+        }
+        
+        const contact = await Contact.findById(id);
+        if (!contact) {
+          errors.push({ id, error: 'Contact not found' });
+          continue;
+        }
+        
+        // Check duplicate
+        const existing = await Contact.findOne({
+          phone: cleanedPhone,
+          batchId: contact.batchId,
+          _id: { $ne: id }
+        });
+        if (existing) {
+          errors.push({ id, error: 'Duplicate phone number' });
+          continue;
+        }
+        
+        contact.name = name.trim();
+        contact.phone = cleanedPhone;
+        if (hasJoinedGroup !== undefined) {
+          contact.hasJoinedGroup = hasJoinedGroup;
+        }
+        await contact.save();
+        updates.push({ id, success: true });
+      } catch (err) {
+        errors.push({ id: item.id || 'unknown', error: err.message });
+      }
+    }
+    
+    res.json({
+      success: true,
+      updates: updates,
+      errors: errors,
+      message: `${updates.length} contacts updated, ${errors.length} errors`
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Download VCF (admin only)
 app.get('/api/admin/download/vcf', authenticate, async (req, res) => {
   try {
@@ -294,7 +425,7 @@ app.get('/api/admin/download/vcf', authenticate, async (req, res) => {
       vcfContent += `BEGIN:VCARD\n`;
       vcfContent += `VERSION:3.0\n`;
       vcfContent += `FN:${contact.name}\n`;
-      vcfContent += `TEL:${contact.phone}\n`;  // Phone already has + or cleaned
+      vcfContent += `TEL:${contact.phone}\n`;
       vcfContent += `END:VCARD\n\n`;
     });
     
@@ -311,7 +442,6 @@ app.get('/api/admin/download/vcf', authenticate, async (req, res) => {
 
 // ============ TIMER CONTROLS ============
 
-// Pause timer
 app.post('/api/admin/pause-timer', authenticate, async (req, res) => {
   try {
     const batch = await Batch.findOne({ isActive: true });
@@ -345,7 +475,6 @@ app.post('/api/admin/pause-timer', authenticate, async (req, res) => {
   }
 });
 
-// Resume timer
 app.post('/api/admin/resume-timer', authenticate, async (req, res) => {
   try {
     const batch = await Batch.findOne({ isActive: true });
@@ -374,7 +503,6 @@ app.post('/api/admin/resume-timer', authenticate, async (req, res) => {
   }
 });
 
-// Reset timer
 app.post('/api/admin/reset-timer', authenticate, async (req, res) => {
   try {
     const batch = await Batch.findOne({ isActive: true });
@@ -402,7 +530,6 @@ app.post('/api/admin/reset-timer', authenticate, async (req, res) => {
   }
 });
 
-// Start new batch
 app.post('/api/admin/new-batch', authenticate, async (req, res) => {
   try {
     await Batch.updateMany({ isActive: true }, { isActive: false });
