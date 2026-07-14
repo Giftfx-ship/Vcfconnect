@@ -106,7 +106,7 @@ const authenticate = async (req, res, next) => {
 
 // ============ API ROUTES ============
 
-// Get batch status
+// Get batch status (for users & admin)
 app.get('/api/batch/status', async (req, res) => {
   try {
     const batch = await Batch.findOne({ isActive: true });
@@ -114,6 +114,8 @@ app.get('/api/batch/status', async (req, res) => {
     
     const now = new Date();
     let effectiveEndTime = new Date(batch.endTime);
+    
+    // Calculate effective end time accounting for pauses
     if (batch.pauseDuration > 0) {
       effectiveEndTime = new Date(batch.endTime.getTime() + batch.pauseDuration);
     }
@@ -155,10 +157,12 @@ app.post('/api/submit', async (req, res) => {
     const batch = await Batch.findOne({ isActive: true });
     if (!batch) return res.status(400).json({ error: 'No active batch' });
     
+    // Check if batch is paused
     if (batch.isPaused) {
       return res.status(400).json({ error: 'Batch is currently paused. Please try again later.' });
     }
     
+    // Check for duplicate phone
     const existing = await Contact.findOne({ 
       phone: phone,
       batchId: batch._id 
@@ -241,6 +245,7 @@ app.get('/api/admin/download/vcf', authenticate, async (req, res) => {
     const batch = await Batch.findOne({ isActive: true });
     if (!batch) return res.status(404).json({ error: 'No active batch' });
     
+    // Calculate effective end time
     let effectiveEndTime = new Date(batch.endTime);
     if (batch.pauseDuration > 0) {
       effectiveEndTime = new Date(batch.endTime.getTime() + batch.pauseDuration);
@@ -277,9 +282,9 @@ app.get('/api/admin/download/vcf', authenticate, async (req, res) => {
   }
 });
 
-// ============ TIMER CONTROLS ============
+// ============ TIMER CONTROLS (Backend - Affects Everyone) ============
 
-// Pause timer
+// Pause timer - affects ALL users
 app.post('/api/admin/pause-timer', authenticate, async (req, res) => {
   try {
     const batch = await Batch.findOne({ isActive: true });
@@ -289,6 +294,7 @@ app.post('/api/admin/pause-timer', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'Timer is already paused' });
     }
     
+    // Check if already expired
     const now = new Date();
     let effectiveEndTime = new Date(batch.endTime);
     if (batch.pauseDuration > 0) {
@@ -313,7 +319,7 @@ app.post('/api/admin/pause-timer', authenticate, async (req, res) => {
   }
 });
 
-// Resume timer
+// Resume timer - affects ALL users
 app.post('/api/admin/resume-timer', authenticate, async (req, res) => {
   try {
     const batch = await Batch.findOne({ isActive: true });
@@ -342,7 +348,7 @@ app.post('/api/admin/resume-timer', authenticate, async (req, res) => {
   }
 });
 
-// Reset timer
+// Reset timer - affects ALL users
 app.post('/api/admin/reset-timer', authenticate, async (req, res) => {
   try {
     const batch = await Batch.findOne({ isActive: true });
