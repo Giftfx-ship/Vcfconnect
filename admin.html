@@ -421,6 +421,12 @@
             font-weight: 500;
         }
 
+        .edit-hint {
+            font-size: 12px;
+            color: var(--gray-400);
+            font-weight: 400;
+        }
+
         .table-wrap {
             overflow-x: auto;
             border-radius: var(--radius);
@@ -467,6 +473,102 @@
 
         .table .joined-no {
             color: var(--gray-400);
+        }
+
+        /* Edit Mode */
+        .edit-input {
+            padding: 6px 10px;
+            border: 1.5px solid var(--primary);
+            border-radius: 6px;
+            font-size: 13px;
+            font-family: inherit;
+            width: 100%;
+            min-width: 120px;
+            background: white;
+        }
+
+        .edit-input:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px var(--primary-glow);
+        }
+
+        .edit-select {
+            padding: 6px 10px;
+            border: 1.5px solid var(--primary);
+            border-radius: 6px;
+            font-size: 13px;
+            font-family: inherit;
+            background: white;
+            cursor: pointer;
+        }
+
+        .edit-select:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px var(--primary-glow);
+        }
+
+        .btn-save-edit {
+            padding: 4px 12px;
+            background: var(--success);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all var(--transition);
+            margin-right: 4px;
+        }
+
+        .btn-save-edit:hover {
+            transform: scale(1.05);
+            opacity: 0.9;
+        }
+
+        .btn-cancel-edit {
+            padding: 4px 12px;
+            background: var(--gray-300);
+            color: var(--gray-700);
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all var(--transition);
+            margin-right: 4px;
+        }
+
+        .btn-cancel-edit:hover {
+            background: var(--gray-400);
+        }
+
+        .btn-delete {
+            padding: 4px 12px;
+            background: var(--danger);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all var(--transition);
+        }
+
+        .btn-delete:hover {
+            transform: scale(1.05);
+            opacity: 0.9;
+        }
+
+        .contact-row {
+            cursor: pointer;
+            transition: background var(--transition);
+        }
+
+        .contact-row:hover {
+            background: var(--gray-50);
         }
 
         .empty-state {
@@ -738,6 +840,20 @@
                 margin-left: 0;
                 justify-content: center;
             }
+
+            .edit-input {
+                min-width: 80px;
+                font-size: 12px;
+                padding: 4px 8px;
+            }
+
+            .btn-save-edit,
+            .btn-cancel-edit,
+            .btn-delete {
+                font-size: 10px;
+                padding: 3px 8px;
+                margin-right: 2px;
+            }
         }
 
         @media (max-width: 480px) {
@@ -755,6 +871,17 @@
 
             .contacts-card {
                 padding: 16px;
+            }
+
+            .table th,
+            .table td {
+                padding: 6px 10px;
+                font-size: 12px;
+            }
+
+            .edit-input {
+                min-width: 60px;
+                font-size: 11px;
             }
         }
     </style>
@@ -851,7 +978,10 @@
                     <!-- Contacts -->
                     <div class="contacts-card">
                         <div class="contacts-header">
-                            <span class="contacts-title">📋 Submitted Contacts</span>
+                            <div>
+                                <span class="contacts-title">📋 Submitted Contacts</span>
+                                <span class="edit-hint"> (Double-click to edit)</span>
+                            </div>
                             <span class="contacts-count" id="contactCount">0 contacts</span>
                         </div>
                         <div class="table-wrap">
@@ -917,6 +1047,7 @@
         let token = localStorage.getItem('adminToken');
         let batchData = null;
         let timerInterval = null;
+        let editingContactId = null;
 
         // ============ DOM REFS ============
         const loginContainer = document.getElementById('loginContainer');
@@ -1082,18 +1213,126 @@
 
             contacts.forEach(contact => {
                 const tr = document.createElement('tr');
+                tr.className = 'contact-row';
+                tr.dataset.id = contact._id;
+                tr.dataset.name = contact.name;
+                tr.dataset.phone = contact.phone;
+                tr.dataset.joined = contact.hasJoinedGroup;
+                
                 const joined = contact.hasJoinedGroup ? '✅' : '❌';
                 const joinedClass = contact.hasJoinedGroup ? 'joined-yes' : 'joined-no';
                 const date = new Date(contact.createdAt).toLocaleDateString();
 
                 tr.innerHTML = `
                     <td><strong>${contact.name}</strong></td>
-                    <td class="phone">+${contact.phone}</td>
+                    <td class="phone">${contact.phone}</td>
                     <td class="${joinedClass}">${joined}</td>
                     <td>${date}</td>
                 `;
                 tbody.appendChild(tr);
             });
+            
+            // Make rows editable
+            makeRowsEditable();
+        }
+
+        // ============ EDIT CONTACT FUNCTIONS ============
+        function makeRowsEditable() {
+            document.querySelectorAll('.contact-row').forEach(row => {
+                // Remove old listeners by cloning
+                const newRow = row.cloneNode(true);
+                row.parentNode.replaceChild(newRow, row);
+                
+                newRow.addEventListener('dblclick', function() {
+                    const id = this.dataset.id;
+                    const name = this.dataset.name;
+                    const phone = this.dataset.phone;
+                    const joined = this.dataset.joined === 'true';
+                    
+                    editingContactId = id;
+                    
+                    // Replace row with edit form
+                    this.innerHTML = `
+                        <td>
+                            <input type="text" class="edit-input" value="${name}" id="editName" />
+                        </td>
+                        <td>
+                            <input type="text" class="edit-input" value="${phone}" id="editPhone" />
+                        </td>
+                        <td>
+                            <select class="edit-select" id="editJoined">
+                                <option value="true" ${joined ? 'selected' : ''}>✅ Joined</option>
+                                <option value="false" ${!joined ? 'selected' : ''}>❌ Not Joined</option>
+                            </select>
+                        </td>
+                        <td>
+                            <button class="btn-save-edit" onclick="saveContact('${id}')">💾 Save</button>
+                            <button class="btn-cancel-edit" onclick="cancelEdit()">✕</button>
+                            <button class="btn-delete" onclick="deleteContact('${id}')">🗑️</button>
+                        </td>
+                    `;
+                });
+            });
+        }
+
+        // Save edited contact
+        async function saveContact(id) {
+            const name = document.getElementById('editName').value.trim();
+            const phone = document.getElementById('editPhone').value.trim();
+            const hasJoinedGroup = document.getElementById('editJoined').value === 'true';
+            
+            if (!name || !phone) {
+                showToast('Name and phone required', 'error');
+                return;
+            }
+            
+            try {
+                const res = await fetch(`/api/admin/contact/${id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ name, phone, hasJoinedGroup })
+                });
+                
+                const data = await res.json();
+                if (data.success) {
+                    showToast('✅ Contact updated!', 'success');
+                    await fetchData();
+                } else {
+                    showToast(data.error || 'Update failed', 'error');
+                }
+            } catch (error) {
+                showToast('Error updating contact', 'error');
+            }
+        }
+
+        // Cancel edit
+        function cancelEdit() {
+            fetchData(); // Reload to reset the row
+        }
+
+        // Delete contact
+        async function deleteContact(id) {
+            if (!confirm('Delete this contact?')) return;
+            
+            try {
+                const res = await fetch(`/api/admin/contact/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                const data = await res.json();
+                if (data.success) {
+                    showToast('🗑️ Contact deleted', 'success');
+                    await fetchData();
+                } else {
+                    showToast(data.error || 'Delete failed', 'error');
+                }
+            } catch (error) {
+                showToast('Error deleting contact', 'error');
+            }
         }
 
         // ============ UPDATE TIMER ============
