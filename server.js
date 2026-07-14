@@ -28,6 +28,25 @@ mongoose.connect(process.env.MONGODB_URI, {
 .then(() => console.log('✅ Database Connected'))
 .catch(err => console.error('❌ Database Error:', err));
 
+// ============ HELPER: Sanitize Input (XSS Protection) ============
+function sanitizeInput(str) {
+    if (!str) return '';
+    // Remove HTML tags and trim
+    return str.replace(/<[^>]*>/g, '').trim();
+}
+
+// ============ HELPER: Clean Phone Number ============
+function cleanPhoneNumber(phone) {
+  let cleaned = phone.replace(/[\s\-\(\)]/g, '');
+  cleaned = cleaned.replace(/^\+\+/, '+');
+  cleaned = cleaned.replace(/^00/, '+');
+  if (cleaned.startsWith('0') && cleaned.length > 1) {
+    cleaned = cleaned.replace(/^0/, '');
+  }
+  cleaned = cleaned.replace(/[^0-9+]/g, '');
+  return cleaned;
+}
+
 // ============ MODELS ============
 const BatchSchema = new mongoose.Schema({
   batchNumber: { type: Number, required: true, unique: true },
@@ -58,18 +77,6 @@ const AdminSchema = new mongoose.Schema({
 const Batch = mongoose.model('Batch', BatchSchema);
 const Contact = mongoose.model('Contact', ContactSchema);
 const Admin = mongoose.model('Admin', AdminSchema);
-
-// ============ HELPER: Clean Phone Number ============
-function cleanPhoneNumber(phone) {
-  let cleaned = phone.replace(/[\s\-\(\)]/g, '');
-  cleaned = cleaned.replace(/^\+\+/, '+');
-  cleaned = cleaned.replace(/^00/, '+');
-  if (cleaned.startsWith('0') && cleaned.length > 1) {
-    cleaned = cleaned.replace(/^0/, '');
-  }
-  cleaned = cleaned.replace(/[^0-9+]/g, '');
-  return cleaned;
-}
 
 // ============ AUTH ============
 const authenticate = async (req, res, next) => {
@@ -156,7 +163,7 @@ app.get('/api/batch/status', async (req, res) => {
   }
 });
 
-// Submit contact
+// Submit contact - WITH XSS PROTECTION
 app.post('/api/submit', async (req, res) => {
   try {
     let { name, phone } = req.body;
@@ -165,7 +172,15 @@ app.post('/api/submit', async (req, res) => {
       return res.status(400).json({ error: 'Name and phone required' });
     }
     
+    // XSS Protection - Sanitize name
+    name = sanitizeInput(name);
+    
+    // Clean phone number
     phone = cleanPhoneNumber(phone);
+    
+    if (!name || name.length < 1) {
+      return res.status(400).json({ error: 'Invalid name' });
+    }
     
     if (!phone || phone.length < 5) {
       return res.status(400).json({ error: 'Invalid phone number' });
@@ -178,6 +193,7 @@ app.post('/api/submit', async (req, res) => {
       return res.status(400).json({ error: 'Batch is currently paused. Please try again later.' });
     }
     
+    // Check for duplicate phone
     const existing = await Contact.findOne({ 
       phone: phone,
       batchId: batch._id 
@@ -187,7 +203,7 @@ app.post('/api/submit', async (req, res) => {
     }
     
     const contact = await Contact.create({
-      name: name.trim(),
+      name: name,
       phone: phone,
       batchId: batch._id,
       ipAddress: req.ip
@@ -254,7 +270,33 @@ app.get('/api/admin/contacts', authenticate, async (req, res) => {
   }
 });
 
-// ============ NEW: EDIT CONTACT (Admin only) ============
+// Get all batches (admin only)
+app.get('/api/admin/batches', authenticate, async (req, res) => {
+  try {
+    const batches = await Batch.find().sort({ batchNumber: -1 });
+    res.json({ batches });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get contacts by batch ID (admin only)
+app.get('/api/admin/batch/:batchId/contacts', authenticate, async (req, res) => {
+  try {
+    const { batchId } = req.params;
+    const contacts = await Contact.find({ batchId: batchId }).sort({ createdAt: -1 });
+    const batch = await Batch.findById(batchId);
+    res.json({
+      contacts,
+      total: contacts.length,
+      batch: batch
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Edit contact (admin only) - WITH XSS PROTECTION
 app.put('/api/admin/contact/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
@@ -264,8 +306,15 @@ app.put('/api/admin/contact/:id', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'Name and phone required' });
     }
     
+    // XSS Protection - Sanitize name
+    name = sanitizeInput(name);
+    
     // Clean phone number
     phone = cleanPhoneNumber(phone);
+    
+    if (!name || name.length < 1) {
+      return res.status(400).json({ error: 'Invalid name' });
+    }
     
     if (!phone || phone.length < 5) {
       return res.status(400).json({ error: 'Invalid phone number' });
@@ -286,7 +335,7 @@ app.put('/api/admin/contact/:id', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'Phone number already exists in this batch' });
     }
     
-    contact.name = name.trim();
+    contact.name = name;
     contact.phone = phone;
     if (hasJoinedGroup !== undefined) {
       contact.hasJoinedGroup = hasJoinedGroup;
@@ -303,7 +352,7 @@ app.put('/api/admin/contact/:id', authenticate, async (req, res) => {
   }
 });
 
-// ============ NEW: DELETE CONTACT (Admin only) ============
+// Delete contact (admin only)
 app.delete('/api/admin/contact/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
@@ -325,73 +374,6 @@ app.delete('/api/admin/contact/:id', authenticate, async (req, res) => {
     res.json({
       success: true,
       message: 'Contact deleted successfully'
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ============ NEW: BULK UPDATE CONTACTS (Admin only) ============
-app.post('/api/admin/contacts/bulk-update', authenticate, async (req, res) => {
-  try {
-    const { contacts } = req.body;
-    
-    if (!contacts || !Array.isArray(contacts)) {
-      return res.status(400).json({ error: 'Invalid contacts data' });
-    }
-    
-    const updates = [];
-    const errors = [];
-    
-    for (const item of contacts) {
-      try {
-        const { id, name, phone, hasJoinedGroup } = item;
-        
-        if (!id || !name || !phone) {
-          errors.push({ id, error: 'Missing required fields' });
-          continue;
-        }
-        
-        const cleanedPhone = cleanPhoneNumber(phone);
-        if (!cleanedPhone || cleanedPhone.length < 5) {
-          errors.push({ id, error: 'Invalid phone number' });
-          continue;
-        }
-        
-        const contact = await Contact.findById(id);
-        if (!contact) {
-          errors.push({ id, error: 'Contact not found' });
-          continue;
-        }
-        
-        // Check duplicate
-        const existing = await Contact.findOne({
-          phone: cleanedPhone,
-          batchId: contact.batchId,
-          _id: { $ne: id }
-        });
-        if (existing) {
-          errors.push({ id, error: 'Duplicate phone number' });
-          continue;
-        }
-        
-        contact.name = name.trim();
-        contact.phone = cleanedPhone;
-        if (hasJoinedGroup !== undefined) {
-          contact.hasJoinedGroup = hasJoinedGroup;
-        }
-        await contact.save();
-        updates.push({ id, success: true });
-      } catch (err) {
-        errors.push({ id: item.id || 'unknown', error: err.message });
-      }
-    }
-    
-    res.json({
-      success: true,
-      updates: updates,
-      errors: errors,
-      message: `${updates.length} contacts updated, ${errors.length} errors`
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
