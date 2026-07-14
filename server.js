@@ -59,6 +59,29 @@ const Batch = mongoose.model('Batch', BatchSchema);
 const Contact = mongoose.model('Contact', ContactSchema);
 const Admin = mongoose.model('Admin', AdminSchema);
 
+// ============ HELPER: Clean Phone Number ============
+function cleanPhoneNumber(phone) {
+  // Remove all spaces, dashes, parentheses
+  let cleaned = phone.replace(/[\s\-\(\)]/g, '');
+  
+  // Remove any '++' at the start (replace with single '+')
+  cleaned = cleaned.replace(/^\+\+/, '+');
+  
+  // If it starts with '00', replace with '+'
+  cleaned = cleaned.replace(/^00/, '+');
+  
+  // If it starts with just '0' and has more digits, remove the leading 0
+  if (cleaned.startsWith('0') && cleaned.length > 1) {
+    // But only if it's not '0' alone
+    cleaned = cleaned.replace(/^0/, '');
+  }
+  
+  // Remove any remaining non-digit characters except '+'
+  cleaned = cleaned.replace(/[^0-9+]/g, '');
+  
+  return cleaned;
+}
+
 // ============ AUTH ============
 const authenticate = async (req, res, next) => {
   try {
@@ -106,7 +129,7 @@ const authenticate = async (req, res, next) => {
 
 // ============ API ROUTES ============
 
-// Get batch status (for users & admin)
+// Get batch status
 app.get('/api/batch/status', async (req, res) => {
   try {
     const batch = await Batch.findOne({ isActive: true });
@@ -115,7 +138,6 @@ app.get('/api/batch/status', async (req, res) => {
     const now = new Date();
     let effectiveEndTime = new Date(batch.endTime);
     
-    // Calculate effective end time accounting for pauses
     if (batch.pauseDuration > 0) {
       effectiveEndTime = new Date(batch.endTime.getTime() + batch.pauseDuration);
     }
@@ -145,24 +167,30 @@ app.get('/api/batch/status', async (req, res) => {
   }
 });
 
-// Submit contact
+// Submit contact - WITH PHONE CLEANUP
 app.post('/api/submit', async (req, res) => {
   try {
-    const { name, phone } = req.body;
+    let { name, phone } = req.body;
     
     if (!name || !phone) {
       return res.status(400).json({ error: 'Name and phone required' });
     }
     
+    // Clean the phone number
+    phone = cleanPhoneNumber(phone);
+    
+    if (!phone || phone.length < 5) {
+      return res.status(400).json({ error: 'Invalid phone number' });
+    }
+    
     const batch = await Batch.findOne({ isActive: true });
     if (!batch) return res.status(400).json({ error: 'No active batch' });
     
-    // Check if batch is paused
     if (batch.isPaused) {
       return res.status(400).json({ error: 'Batch is currently paused. Please try again later.' });
     }
     
-    // Check for duplicate phone
+    // Check for duplicate phone (using cleaned phone)
     const existing = await Contact.findOne({ 
       phone: phone,
       batchId: batch._id 
@@ -172,8 +200,8 @@ app.post('/api/submit', async (req, res) => {
     }
     
     const contact = await Contact.create({
-      name,
-      phone,
+      name: name.trim(),
+      phone: phone,
       batchId: batch._id,
       ipAddress: req.ip
     });
@@ -245,7 +273,6 @@ app.get('/api/admin/download/vcf', authenticate, async (req, res) => {
     const batch = await Batch.findOne({ isActive: true });
     if (!batch) return res.status(404).json({ error: 'No active batch' });
     
-    // Calculate effective end time
     let effectiveEndTime = new Date(batch.endTime);
     if (batch.pauseDuration > 0) {
       effectiveEndTime = new Date(batch.endTime.getTime() + batch.pauseDuration);
@@ -267,7 +294,7 @@ app.get('/api/admin/download/vcf', authenticate, async (req, res) => {
       vcfContent += `BEGIN:VCARD\n`;
       vcfContent += `VERSION:3.0\n`;
       vcfContent += `FN:${contact.name}\n`;
-      vcfContent += `TEL:+${contact.phone}\n`;
+      vcfContent += `TEL:${contact.phone}\n`;  // Phone already has + or cleaned
       vcfContent += `END:VCARD\n\n`;
     });
     
@@ -282,9 +309,9 @@ app.get('/api/admin/download/vcf', authenticate, async (req, res) => {
   }
 });
 
-// ============ TIMER CONTROLS (Backend - Affects Everyone) ============
+// ============ TIMER CONTROLS ============
 
-// Pause timer - affects ALL users
+// Pause timer
 app.post('/api/admin/pause-timer', authenticate, async (req, res) => {
   try {
     const batch = await Batch.findOne({ isActive: true });
@@ -294,7 +321,6 @@ app.post('/api/admin/pause-timer', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'Timer is already paused' });
     }
     
-    // Check if already expired
     const now = new Date();
     let effectiveEndTime = new Date(batch.endTime);
     if (batch.pauseDuration > 0) {
@@ -319,7 +345,7 @@ app.post('/api/admin/pause-timer', authenticate, async (req, res) => {
   }
 });
 
-// Resume timer - affects ALL users
+// Resume timer
 app.post('/api/admin/resume-timer', authenticate, async (req, res) => {
   try {
     const batch = await Batch.findOne({ isActive: true });
@@ -348,7 +374,7 @@ app.post('/api/admin/resume-timer', authenticate, async (req, res) => {
   }
 });
 
-// Reset timer - affects ALL users
+// Reset timer
 app.post('/api/admin/reset-timer', authenticate, async (req, res) => {
   try {
     const batch = await Batch.findOne({ isActive: true });
