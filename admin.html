@@ -1213,7 +1213,7 @@
 
                 const data = await res.json();
                 if (data.success) {
-                    showToast('⏸️ Timer paused', 'warning');
+                    showToast('⏸️ Timer paused for everyone', 'warning');
                     await fetchData();
                 } else {
                     showToast(data.error || 'Failed to pause', 'error');
@@ -1235,7 +1235,7 @@
 
                 const data = await res.json();
                 if (data.success) {
-                    showToast('▶️ Timer resumed', 'success');
+                    showToast('▶️ Timer resumed for everyone', 'success');
                     await fetchData();
                 } else {
                     showToast(data.error || 'Failed to resume', 'error');
