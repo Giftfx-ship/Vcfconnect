@@ -1574,43 +1574,60 @@
         });
 
         // ============ DOWNLOAD VCF ============
-        downloadBtn.addEventListener('click', async () => {
-            if (!token) return;
+downloadBtn.addEventListener('click', async () => {
+    if (!token) return;
 
-            try {
-                const res = await fetch('/api/admin/download/vcf', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
+    try {
+        showToast('⏳ Generating VCF file...', 'warning');
 
-                if (res.status === 401) {
-                    token = null;
-                    localStorage.removeItem('adminToken');
-                    showLogin();
-                    return;
-                }
-
-                if (!res.ok) {
-                    const data = await res.json();
-                    showToast(data.error || 'Download failed', 'error');
-                    return;
-                }
-
-                const blob = await res.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `batch_${batchData?.batchNumber || 1}_contacts.vcf`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                window.URL.revokeObjectURL(url);
-
-                showToast('✅ VCF downloaded successfully!', 'success');
-            } catch (error) {
-                showToast('Error downloading VCF', 'error');
-            }
+        const res = await fetch('/api/admin/download/vcf', {
+            headers: { 'Authorization': `Bearer ${token}` }
         });
 
+        if (res.status === 401) {
+            token = null;
+            localStorage.removeItem('adminToken');
+            showLogin();
+            return;
+        }
+
+        if (!res.ok) {
+            const data = await res.json();
+            showToast(data.error || 'Download failed', 'error');
+            return;
+        }
+
+        // ✅ FIX: Get the blob and verify size
+        const blob = await res.blob();
+        console.log('📄 Blob size:', blob.size, 'bytes');
+        console.log('📄 Blob type:', blob.type);
+
+        if (blob.size === 0) {
+            showToast('❌ File is empty!', 'error');
+            return;
+        }
+
+        // ✅ FIX: Create download with proper filename
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `batch_${batchData?.batchNumber || 1}_${batchData?.totalContacts || 0}_contacts.vcf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        
+        // Clean up
+        setTimeout(() => {
+            window.URL.revokeObjectURL(url);
+        }, 100);
+
+        showToast(`✅ VCF downloaded! (${batchData?.totalContacts || 0} contacts)`, 'success');
+
+    } catch (error) {
+        console.error('❌ Download error:', error);
+        showToast('Error downloading VCF', 'error');
+    }
+});
         // ============ START NEW BATCH ============
         newBatchBtn.addEventListener('click', async () => {
             if (!token) return;
